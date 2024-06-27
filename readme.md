@@ -1,5 +1,5 @@
 <p align="center">
-	<img src="Media/logo.png" width="64" height="64">
+	<img src="Media/icon.png" width="64" height="64">
 	<h3 align="center">CaptureKit</h3>
 	<p align="center">Record the screen on macOS with ScreenCaptureKit.</p>
 </p>

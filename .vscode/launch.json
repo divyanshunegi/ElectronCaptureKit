@@ -1,0 +1,28 @@
+{
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "sourceLanguages": [
+                "swift"
+            ],
+            "args": [],
+            "cwd": "${workspaceFolder:ElectronCaptureKit}",
+            "name": "Debug capturekit",
+            "program": "${workspaceFolder:ElectronCaptureKit}/.build/debug/capturekit",
+            "preLaunchTask": "swift: Build Debug capturekit"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "sourceLanguages": [
+                "swift"
+            ],
+            "args": [],
+            "cwd": "${workspaceFolder:ElectronCaptureKit}",
+            "name": "Release capturekit",
+            "program": "${workspaceFolder:ElectronCaptureKit}/.build/release/capturekit",
+            "preLaunchTask": "swift: Build Release capturekit"
+        }
+    ]
+}

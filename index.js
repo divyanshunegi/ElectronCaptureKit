@@ -1,95 +1,73 @@
-import os from 'node:os';
-import { debuglog } from 'node:util';
-import path from 'node:path';
-import url from 'node:url';
 import { execa } from 'execa';
-import { temporaryFile } from 'tempy';
-import { assertMacOSVersionGreaterThanOrEqualTo } from 'macos-version';
-import fileUrl from 'file-url';
-import { fixPathForAsarUnpack } from 'electron-util/node';
-import delay from 'delay';
-
-const log = debuglog('capturekit');
-const getRandomId = () => Math.random().toString(36).slice(2, 15);
-
-const dirname_ = path.dirname(url.fileURLToPath(import.meta.url));
-// Workaround for https://github.com/electron/electron/issues/9459
-const BINARY = path.join(fixPathForAsarUnpack(dirname_), 'capturekit');
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const BINARY = path.join(__dirname, 'capturekit');
 
 class Recorder {
     constructor() {
-        assertMacOSVersionGreaterThanOrEqualTo('12.3');
         this.process = null;
     }
 
-    async startRecording({
-        fps = 30,
-        showCursor = true,
-        displayId = 1, // Assuming main display by default
-    } = {}) {
+    async startRecording(config = {}) {
         if (this.process) {
-            throw new Error('Recording is already in progress. Call stopRecording() first.');
+            throw new Error('Recording is already in progress');
         }
-
-        const config = JSON.stringify({
-            fps,
-            showCursor,
-            displayId,
+        const configJSON = JSON.stringify(config);        
+        this.process = execa(BINARY, [configJSON]);
+        this.process.stdout.on('data', (data) => {
+            console.log(`capturekit: ${data.toString().trim()}`);
         });
-
-        this.process = execa(BINARY, ['start', config]);
-
-        return new Promise((resolve, reject) => {
+        this.process.stderr.on('data', (data) => {
+            console.error(`capturekit error: ${data.toString().trim()}`);
+        });
+        // Wait for the "Recording started" message
+        new Promise((resolve, reject) => {
             this.process.stdout.on('data', (data) => {
-                const message = data.toString().trim();
-                log(message);
-                if (message.includes('Capture started.')) {
+                if (data.toString().includes('Recording started')) {
                     resolve();
                 }
             });
-
-            this.process.stderr.on('data', (data) => {
-                log(`stderr: ${data}`);
-            });
-
-            this.process.on('error', (error) => {
-                reject(error);
-            });
+            this.process.on('error', reject);
         });
     }
 
     async stopRecording() {
         if (!this.process) {
-            throw new Error('No recording in progress. Call startRecording() first.');
+            throw new Error('No recording in progress');
         }
-
-        this.process.stdin.write('stop\n');
-
+    
         return new Promise((resolve, reject) => {
+            let output = '';
+    
+            // Collect all stdout data
             this.process.stdout.on('data', (data) => {
-                const message = data.toString().trim();
-                log(message);
-                if (message.startsWith('Recording stopped. Output path:')) {
-                    const outputPath = message.split(':')[1].trim();
-                    this.process = null;
-                    resolve(outputPath);
+                output += data.toString();
+                console.log(`capturekit: ${data.toString().trim()}`);
+            });
+    
+            // Send the 'stop' command
+            this.process.stdin.write('stop\n');
+    
+            this.process.on('close', (code) => {
+                this.process = null;
+                if (code !== 0) {
+                    reject(new Error(`Process exited with code ${code}`));
+                    return;
+                }
+    
+                // Extract the output path from the collected stdout
+                const match = output.match(/Output path: (.+)/);
+                if (match) {
+                    resolve(match[1].trim());
+                } else {
+                    reject(new Error('Could not find output path in process output'));
                 }
             });
-
-            this.process.on('error', (error) => {
-                reject(error);
-            });
+    
+            this.process.on('error', reject);
         });
     }
 }
 
 export const recorder = new Recorder();
-
-export const getAvailableDisplays = async () => {
-    const { stdout } = await execa(BINARY, ['start', '{"fps": 30, "showCursor": true, "displayId": 1}']);
-    const displays = stdout.match(/Available displays: (.*)/);
-    if (displays && displays[1]) {
-        return displays[1].split(', ').map(Number);
-    }
-    return [];
-};

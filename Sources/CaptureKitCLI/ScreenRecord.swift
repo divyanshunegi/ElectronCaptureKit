@@ -4,12 +4,12 @@ import AVFoundation
 import CoreGraphics
 import ArgumentParser
 
-
 struct Config: Codable {
     let fps: Int
     let showCursor: Bool
     let displayId: CGDirectDisplayID
 }
+
 
 @main
 struct CaptureKitCLI: ParsableCommand {
@@ -17,12 +17,39 @@ struct CaptureKitCLI: ParsableCommand {
         commandName: "capturekit",
         abstract: "A command-line tool for screen recording using ScreenCaptureKit"
     )
+    
+    @Argument(help: "JSON configuration for recording (optional)")
+    var configJSON: String?
 
     func run() throws {
         let service = ScreenRecorderService()
-        service.start()
         
-        RunLoop.main.run()
+        if let configJSON = configJSON {
+            service.startRecording(configJSON: configJSON)
+        } else {
+            // Use default configuration
+            let defaultConfig = Config(fps: 30, showCursor: true, displayId: CGMainDisplayID())
+            let jsonEncoder = JSONEncoder()
+            if let defaultConfigJSON = String(data: try jsonEncoder.encode(defaultConfig), encoding: .utf8) {
+                service.startRecording(configJSON: defaultConfigJSON)
+            } else {
+                throw NSError(domain: "CaptureKit", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create default configuration"])
+            }
+        }
+        
+        print("Recording started. Type 'stop' and press Enter to stop recording.")
+        
+        while let input = readLine()?.lowercased() {
+            if input == "stop" {
+                service.stopRecording()
+                break
+            } else {
+                print("Unknown command. Type 'stop' to end recording.")
+            }
+        }
+        
+        // Wait for the recording to finish saving
+        service.waitForCompletion()
     }
 }
 
@@ -220,56 +247,38 @@ class ScreenRecorder: NSObject, SCStreamOutput {
 class ScreenRecorderService {
     private let recorder = ScreenRecorder()
     private let commandQueue = DispatchQueue(label: "com.screenrecorder.commandQueue")
+    private let completionGroup = DispatchGroup()
     
-    func start() {
-        print("ScreenRecorderService started. Available commands:")
-        print("start {config_json} - Start recording")
-        print("stop - Stop recording")
-        print("exit - Exit the service")
-        
-        DispatchQueue.global().async {
-            while let command = readLine() {
-                self.handleCommand(command)
+    func startRecording(configJSON: String) {
+        completionGroup.enter()
+        commandQueue.async {
+            Task {
+                do {
+                    try await self.recorder.startCapture(configJSON: configJSON)
+                } catch {
+                    print("Error starting capture: \(error)")
+                    self.completionGroup.leave()
+                }
             }
         }
     }
     
-    private func handleCommand(_ command: String) {
-        let components = command.split(separator: " ", maxSplits: 1)
-        guard let action = components.first else { return }
-        
-        switch action {
-        case "start":
-            guard components.count > 1 else {
-                print("Error: Config JSON required for start command")
-                return
-            }
-            let configJSON = String(components[1])
-            commandQueue.async {
-                Task {
-                    do {
-                        try await self.recorder.startCapture(configJSON: configJSON)
-                    } catch {
-                        print("Error starting capture: \(error)")
-                    }
+    func stopRecording() {
+        commandQueue.async {
+            Task {
+                do {
+                    let outputPath = try await self.recorder.stopCapture()
+                    print("Recording stopped. Output path: \(outputPath)")
+                    self.completionGroup.leave()
+                } catch {
+                    print("Error stopping capture: \(error)")
+                    self.completionGroup.leave()
                 }
             }
-        case "stop":
-            commandQueue.async {
-                Task {
-                    do {
-                        let outputPath = try await self.recorder.stopCapture()
-                        print("Recording stopped. Output path: \(outputPath)")
-                    } catch {
-                        print("Error stopping capture: \(error)")
-                    }
-                }
-            }
-        case "exit":
-            print("Exiting ScreenRecorderService")
-            exit(0)
-        default:
-            print("Unknown command: \(action)")
         }
+    }
+    
+    func waitForCompletion() {
+        completionGroup.wait()
     }
 }

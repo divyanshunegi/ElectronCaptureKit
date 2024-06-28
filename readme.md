@@ -109,7 +109,7 @@ Show the cursor in the screen recording.
 #### screenId
 
 Type: `number`\
-Default: `aperture.screens()[0]` _(Primary screen)_
+Default: `capture.screens()[0]` _(Primary screen)_
 
 Screen to record.
 

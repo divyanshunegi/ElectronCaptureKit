@@ -1,0 +1,9 @@
+node_modules
+yarn.lock
+/.build
+xcuserdata
+/Packages
+/*.xcodeproj
+/capturekit
+
+recording.mp4

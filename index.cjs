@@ -1,8 +1,8 @@
-import { execa } from 'execa';
-import path from 'path';
-import { fileURLToPath } from 'url';
+'use strict';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const path = require('path');
+const execa = require('execa');
+
 const BINARY = path.join(__dirname, 'capturekit');
 
 class Recorder {
@@ -71,4 +71,6 @@ class Recorder {
     }
 }
 
-export const recorder = new Recorder();
+const recorder = new Recorder();
+
+module.exports = { recorder };

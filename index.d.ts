@@ -1,11 +1,8 @@
-declare class CaptureKit {
-    constructor();
-    startRecording(options?: {
-      fps?: number;
-      showCursor?: boolean;
-      displayId?: number;
-    }): Promise<void>;
+declare class Recorder {
+    startRecording(config?: any): Promise<void>;
     stopRecording(): Promise<string>;
-  }
-  
-  export = CaptureKit;
+}
+
+export const recorder: Recorder;
+
+export as namespace capturekit;

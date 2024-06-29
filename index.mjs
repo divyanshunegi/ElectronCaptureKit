@@ -23,7 +23,7 @@ class Recorder {
             console.error(`capturekit error: ${data.toString().trim()}`);
         });
         // Wait for the "Recording started" message
-        await new Promise((resolve, reject) => {
+        new Promise((resolve, reject) => {
             this.process.stdout.on('data', (data) => {
                 if (data.toString().includes('Recording started')) {
                     resolve();

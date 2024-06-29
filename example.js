@@ -1,6 +1,5 @@
-import fs from 'fs';
 import { recorder } from './index.js';
-import readline from 'readline';
+import readline from 'node:readline';
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -11,25 +10,28 @@ async function main() {
     try {
         console.log('Starting recording...');
         
-        recorder.startRecording({
+        await recorder.startRecording({
             fps: 30,
             showCursor: true,
             displayId: 3 // Use the first available display
         });
 
-        console.log('Recording started. Type "stop" and press Enter to stop recording, or wait for 30 seconds.');
+        console.log('Recording started. Waiting for 5 seconds before stopping...');
 
-        // Set up a promise that resolves when the user types "stop"
-       
         setTimeout(async () => {
             console.log('Stopping recording...');
-            const path = await recorder.stopRecording();
-            console.log('Recording PATH:', path);
+            try {
+                const path = await recorder.stopRecording();
+                console.log('Recording PATH:', path);
+            } catch (error) {
+                console.error('Error stopping recording:', error);
+            } finally {
+                rl.close();
+            }
         }, 5000);
 
     } catch (error) {
         console.error('An error occurred:', error);
-    } finally {
         rl.close();
     }
 }
